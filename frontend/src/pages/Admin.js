@@ -1,104 +1,123 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import AdminMap from "./AdminMap";
 import axios from "axios";
 
-function Admin() {
-  const [roadName, setRoadName] = useState("");
-  const [status, setStatus] = useState("Blocked");
+function AdminPage() {
+  const [areas, setAreas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    fetchAreas();
+  }, []);
 
-    if (!roadName) {
-      alert("Please enter road/location name");
-      return;
-    }
-
+  const fetchAreas = async () => {
+    setLoading(true);
     try {
-      // API call to FastAPI backend (adjust port if needed)
-      await axios.post("http://127.0.0.1:8000/add-road", {
-        name: roadName,
-        status: status,
-      });
-
-      setMessage(`✅ Road "${roadName}" marked as ${status}`);
-      setRoadName("");
-      setStatus("Blocked");
-    } catch (error) {
-      console.error(error);
-      setMessage("❌ Failed to update road status. Check backend.");
+      const res = await axios.get("/api/areas");
+      setAreas(res.data);
+    } catch (err) {
+      setAreas([]);
+      setMessage("Error loading areas.");
     }
+    setLoading(false);
+  };
+
+  // Callback for AdminMap to notify when an area is updated
+  const handleAreaUpdated = (msg) => {
+    setMessage(msg);
+    fetchAreas();
   };
 
   return (
-    <div style={styles.container}>
-      <h2>🛠️ Admin Dashboard</h2>
-      <p>Mark roads as <b>Blocked</b>, <b>Cleared</b>, or <b>Maintenance</b>.</p>
-
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <input
-          type="text"
-          placeholder="Enter Road/Location Name"
-          value={roadName}
-          onChange={(e) => setRoadName(e.target.value)}
-          style={styles.input}
-        />
-
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          style={styles.select}
-        >
-          <option value="Blocked">Blocked</option>
-          <option value="Cleared">Cleared</option>
-          <option value="Maintenance">Maintenance</option>
-        </select>
-
-        <button type="submit" style={styles.btn}>
-          Update Road Status
-        </button>
-      </form>
-
-      {message && <p style={styles.message}>{message}</p>}
+    <div style={{ maxWidth: 1100, margin: "auto", padding: 24 }}>
+      <h1>Admin Dashboard</h1>
+      {message && (
+        <div style={{
+          background: "#e3f2fd",
+          color: "#1976d2",
+          padding: "10px 18px",
+          borderRadius: "6px",
+          marginBottom: "18px",
+          fontWeight: "bold"
+        }}>
+          {message}
+        </div>
+      )}
+      <AdminMap onAreaUpdated={handleAreaUpdated} />
+      <h2 style={{ marginTop: 32 }}>All Areas & Status</h2>
+      {loading ? (
+        <div>Loading...</div>
+      ) : areas.length === 0 ? (
+        <div>No areas marked yet.</div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
+          <thead>
+            <tr style={{ background: "#222", color: "#fff" }}>
+              <th style={thStyle}>Area Points</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Last Updated</th>
+              <th style={thStyle}>History</th>
+            </tr>
+          </thead>
+          <tbody>
+            {areas.map((area, idx) => (
+              <tr key={idx} style={{ background: idx % 2 ? "#f5f5f5" : "#fff" }}>
+                <td style={tdStyle}>
+                  {area.area.map((pt, i) => (
+                    <span key={i}>[{pt[0].toFixed(4)}, {pt[1].toFixed(4)}] </span>
+                  ))}
+                </td>
+                <td style={tdStyle}>
+                  <span style={{
+                    color: area.status === "Blocked" ? "red" :
+                          area.status === "Maintenance" ? "orange" : "green",
+                    fontWeight: "bold"
+                  }}>
+                    {area.status}
+                  </span>
+                </td>
+                <td style={tdStyle}>{new Date(area.updatedAt).toLocaleString()}</td>
+                <td style={tdStyle}>
+                  {area.history && area.history.length > 0 ? (
+                    <ul style={{ margin: 0, paddingLeft: 16 }}>
+                      {area.history.map((h, hi) => (
+                        <li key={hi}>
+                          {h.status} at {new Date(h.time).toLocaleString()}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
 
-const styles = {
-  container: {
-    textAlign: "center",
-    padding: "30px",
-  },
-  form: {
-    marginTop: "20px",
-  },
-  input: {
-    padding: "10px",
-    margin: "10px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    width: "250px",
-  },
-  select: {
-    padding: "10px",
-    margin: "10px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    width: "200px",
-  },
-  btn: {
-    padding: "10px 20px",
-    background: "#ff4757",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
-  message: {
-    marginTop: "20px",
-    fontWeight: "bold",
-  },
+const thStyle = {
+  padding: "8px",
+  border: "1px solid #ccc",
+  fontWeight: "bold",
+
+
+
+
+
+
+ 
+
+
+
 };
 
-export default Admin;
+const tdStyle = {
+  padding: "8px",
+  border: "1px solid #ddd",
+  fontSize: "15px",
+};
+
+export default AdminPage;

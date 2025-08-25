@@ -1,61 +1,120 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+
+const styles = {
+  container: {
+    maxWidth: 400,
+    margin: "60px auto",
+    padding: "32px",
+    background: "linear-gradient(120deg, #222 70%, #444 100%)",
+    borderRadius: "16px",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
+    color: "#fff",
+  },
+  title: {
+    fontSize: "2rem",
+    fontWeight: "bold",
+    marginBottom: "24px",
+    textAlign: "center",
+    letterSpacing: "1px",
+  },
+  input: {
+    width: "100%",
+    padding: "12px",
+    margin: "10px 0",
+    borderRadius: "8px",
+    border: "none",
+    fontSize: "1rem",
+    background: "#333",
+    color: "#fff",
+  },
+  button: {
+    width: "100%",
+    padding: "12px",
+    background: "#ffd700",
+    color: "#222",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "bold",
+    fontSize: "1.1rem",
+    cursor: "pointer",
+    marginTop: "18px",
+    transition: "background 0.2s",
+  },
+  error: {
+    background: "#ffebee",
+    color: "#d32f2f",
+    padding: "10px",
+    borderRadius: "6px",
+    marginBottom: "12px",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  success: {
+    background: "#e3f2fd",
+    color: "#1976d2",
+    padding: "10px",
+    borderRadius: "6px",
+    marginBottom: "12px",
+    textAlign: "center",
+    fontWeight: "bold",
+  }
+};
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [msg, setMsg] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setMsg("");
+    setSuccess(false);
     try {
-      const res = await axios.post("http://127.0.0.1:8000/login", {
+      const res = await axios.post("http://localhost:5000/api/login", {
         username,
         password,
       });
-      onLogin(res.data.user); // save user in App.js
-      navigate("/driver"); // redirect to driver dashboard
+      if (res.data.success) {
+        setSuccess(true);
+        setMsg("Login successful!");
+        if (onLogin) onLogin(res.data.user);
+      } else {
+        setMsg(res.data.message || "Login failed.");
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || "Login failed");
+      setMsg("Invalid username or password.");
     }
   };
 
   return (
     <div style={styles.container}>
-      <h2>Login</h2>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <form onSubmit={handleLogin} style={styles.form}>
+      <div style={styles.title}>Login</div>
+      {msg && (
+        <div style={success ? styles.success : styles.error}>{msg}</div>
+      )}
+      <form onSubmit={handleSubmit}>
         <input
+          style={styles.input}
           type="text"
           placeholder="Username"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={e => setUsername(e.target.value)}
           required
-          style={styles.input}
         />
         <input
+          style={styles.input}
           type="password"
           placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={e => setPassword(e.target.value)}
           required
-          style={styles.input}
         />
-        <button type="submit" style={styles.button}>
-          Login
-        </button>
+        <button style={styles.button} type="submit">Login</button>
       </form>
     </div>
   );
 }
-
-const styles = {
-  container: { maxWidth: "400px", margin: "50px auto", textAlign: "center" },
-  form: { display: "flex", flexDirection: "column", gap: "15px" },
-  input: { padding: "10px", borderRadius: "6px", border: "1px solid #ccc" },
-  button: { padding: "10px", background: "#007bff", color: "white", border: "none", borderRadius: "6px" },
-};
 
 export default Login;

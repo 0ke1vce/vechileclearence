@@ -1,7 +1,9 @@
-import React, { useState } from "react";
-import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
+import React, { useState, useEffect } from "react";
+import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import "leaflet-routing-machine";
+import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 
 // Fix marker issue with Webpack
 delete L.Icon.Default.prototype._getIconUrl;
@@ -17,20 +19,37 @@ L.Icon.Default.mergeOptions({
 function Driver() {
   const [start, setStart] = useState("");
   const [destination, setDestination] = useState("");
-  const [route, setRoute] = useState([]);
+  const [map, setMap] = useState(null);
+  const [routingControl, setRoutingControl] = useState(null);
+  const [vehicleWidth, setVehicleWidth] = useState("");
+  const [vehicleHeight, setVehicleHeight] = useState("");
+  const [vehicleLength, setVehicleLength] = useState("");
 
-  // Fake route generator (demo purpose)
+  useEffect(() => {
+    if (map) {
+      if (routingControl) {
+        map.removeControl(routingControl);
+      }
+
+      const newRoutingControl = L.Routing.control({
+        waypoints: [],
+        routeWhileDragging: true,
+      }).addTo(map);
+
+      setRoutingControl(newRoutingControl);
+    }
+  }, [map]);
+
   const handleGetRoute = () => {
-    if (start && destination) {
-      // Example coordinates for Delhi
-      const demoRoute = [
-        [28.6139, 77.209], // India Gate
-        [28.7041, 77.1025], // Delhi West
-        [28.5355, 77.391], // Noida
-      ];
-      setRoute(demoRoute);
+    if (start && destination && vehicleWidth && vehicleHeight && vehicleLength) {
+      if (routingControl) {
+        routingControl.setWaypoints([
+          L.latLng(start.split(",").map(Number)),
+          L.latLng(destination.split(",").map(Number)),
+        ]);
+      }
     } else {
-      alert("Please enter both start and destination");
+      alert("Please enter all fields, including vehicle dimensions");
     }
   };
 
@@ -42,18 +61,41 @@ function Driver() {
       <div style={styles.form}>
         <input
           type="text"
-          placeholder="Enter Current Location"
+          placeholder="Enter Current Location (lat,lng)"
           value={start}
           onChange={(e) => setStart(e.target.value)}
           style={styles.input}
         />
         <input
           type="text"
-          placeholder="Enter Destination"
+          placeholder="Enter Destination (lat,lng)"
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
           style={styles.input}
         />
+        <div style={styles.dimensionContainer}>
+          <input
+            type="number"
+            placeholder="Width (m)"
+            value={vehicleWidth}
+            onChange={(e) => setVehicleWidth(e.target.value)}
+            style={styles.dimensionInput}
+          />
+          <input
+            type="number"
+            placeholder="Height (m)"
+            value={vehicleHeight}
+            onChange={(e) => setVehicleHeight(e.target.value)}
+            style={styles.dimensionInput}
+          />
+          <input
+            type="number"
+            placeholder="Length (m)"
+            value={vehicleLength}
+            onChange={(e) => setVehicleLength(e.target.value)}
+            style={styles.dimensionInput}
+          />
+        </div>
         <button onClick={handleGetRoute} style={styles.btn}>
           Get Safe Route
         </button>
@@ -65,21 +107,12 @@ function Driver() {
           center={[28.6139, 77.209]} // Delhi default
           zoom={11}
           style={{ height: "400px", width: "100%" }}
+          whenCreated={setMap}
         >
           <TileLayer
             attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-
-          {/* Show route on map */}
-          {route.length > 0 && (
-            <>
-              {route.map((point, index) => (
-                <Marker key={index} position={point} />
-              ))}
-              <Polyline positions={route} color="blue" />
-            </>
-          )}
         </MapContainer>
       </div>
     </div>
@@ -100,6 +133,18 @@ const styles = {
     borderRadius: "6px",
     border: "1px solid #ccc",
     width: "250px",
+  },
+  dimensionContainer: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "10px",
+    marginBottom: "10px",
+  },
+  dimensionInput: {
+    padding: "10px",
+    borderRadius: "6px",
+    border: "1px solid #ccc",
+    width: "80px",
   },
   btn: {
     padding: "10px 20px",
