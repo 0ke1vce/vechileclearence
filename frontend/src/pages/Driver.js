@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { MapContainer, TileLayer } from "react-leaflet";
+import React, { useState, useEffect, useCallback } from "react";
+import { MapContainer, TileLayer, useMapEvents, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 
-// Fix marker issue with Webpack
+// Fix marker icon issue with Webpack
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -16,105 +16,96 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
+// Component to handle map clicks for routing
+function LocationSelector({ waypoints, onWaypointsChange }) {
+  useMapEvents({
+    click(e) {
+      if (waypoints.length < 2) {
+        const newWaypoints = [...waypoints, e.latlng];
+        onWaypointsChange(newWaypoints);
+      }
+    },
+  });
+
+  return (
+    <>
+      {waypoints.map((point, index) => (
+        <Marker key={index} position={point} />
+      ))}
+    </>
+  );
+}
+
 function Driver() {
-  const [start, setStart] = useState("");
-  const [destination, setDestination] = useState("");
   const [map, setMap] = useState(null);
   const [routingControl, setRoutingControl] = useState(null);
-  const [vehicleWidth, setVehicleWidth] = useState("");
-  const [vehicleHeight, setVehicleHeight] = useState("");
-  const [vehicleLength, setVehicleLength] = useState("");
+  const [waypoints, setWaypoints] = useState([]);
 
+  // Initialize the routing control
   useEffect(() => {
-    if (map) {
-      if (routingControl) {
-        map.removeControl(routingControl);
-      }
-
-      const newRoutingControl = L.Routing.control({
+    if (map && !routingControl) {
+      const control = L.Routing.control({
         waypoints: [],
-        routeWhileDragging: true,
+        routeWhileDragging: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        showAlternatives: false,
       }).addTo(map);
-
-      setRoutingControl(newRoutingControl);
+      setRoutingControl(control);
     }
-  }, [map]);
+  }, [map, routingControl]);
 
-  const handleGetRoute = () => {
-    if (start && destination && vehicleWidth && vehicleHeight && vehicleLength) {
-      if (routingControl) {
-        routingControl.setWaypoints([
-          L.latLng(start.split(",").map(Number)),
-          L.latLng(destination.split(",").map(Number)),
-        ]);
+  // Update route when waypoints change
+  useEffect(() => {
+    if (routingControl) {
+      if (waypoints.length === 2) {
+        routingControl.setWaypoints(waypoints);
+      } else {
+        // Clear the route if waypoints are reset
+        routingControl.setWaypoints([]);
       }
-    } else {
-      alert("Please enter all fields, including vehicle dimensions");
     }
+  }, [routingControl, waypoints]);
+
+  const handleWaypointsChange = useCallback((newWaypoints) => {
+    setWaypoints(newWaypoints);
+  }, []);
+
+  const handleReset = () => {
+    setWaypoints([]);
   };
 
   return (
     <div style={styles.container}>
       <h2>🚗 Driver Dashboard</h2>
-
-      {/* Input Fields */}
-      <div style={styles.form}>
-        <input
-          type="text"
-          placeholder="Enter Current Location (lat,lng)"
-          value={start}
-          onChange={(e) => setStart(e.target.value)}
-          style={styles.input}
-        />
-        <input
-          type="text"
-          placeholder="Enter Destination (lat,lng)"
-          value={destination}
-          onChange={(e) => setDestination(e.target.value)}
-          style={styles.input}
-        />
-        <div style={styles.dimensionContainer}>
-          <input
-            type="number"
-            placeholder="Width (m)"
-            value={vehicleWidth}
-            onChange={(e) => setVehicleWidth(e.target.value)}
-            style={styles.dimensionInput}
-          />
-          <input
-            type="number"
-            placeholder="Height (m)"
-            value={vehicleHeight}
-            onChange={(e) => setVehicleHeight(e.target.value)}
-            style={styles.dimensionInput}
-          />
-          <input
-            type="number"
-            placeholder="Length (m)"
-            value={vehicleLength}
-            onChange={(e) => setVehicleLength(e.target.value)}
-            style={styles.dimensionInput}
-          />
-        </div>
-        <button onClick={handleGetRoute} style={styles.btn}>
-          Get Safe Route
-        </button>
-      </div>
+      <p style={styles.instructions}>
+        {waypoints.length === 0 && "Click on the map to set your start point."}
+        {waypoints.length === 1 && "Click on the map to set your destination point."}
+        {waypoints.length === 2 && "Route is displayed below."}
+      </p>
 
       {/* Map Display */}
       <div style={styles.mapContainer}>
         <MapContainer
           center={[28.6139, 77.209]} // Delhi default
           zoom={11}
-          style={{ height: "400px", width: "100%" }}
+          style={{ height: "500px", width: "100%" }}
           whenCreated={setMap}
         >
           <TileLayer
             attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          <LocationSelector
+            waypoints={waypoints}
+            onWaypointsChange={handleWaypointsChange}
+          />
         </MapContainer>
       </div>
+      <button onClick={handleReset} style={styles.btn}>
+        Reset Route
+      </button>
     </div>
   );
 }
@@ -124,39 +115,22 @@ const styles = {
     textAlign: "center",
     padding: "30px",
   },
-  form: {
-    marginBottom: "20px",
-  },
-  input: {
-    padding: "10px",
-    margin: "10px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    width: "250px",
-  },
-  dimensionContainer: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "10px",
-    marginBottom: "10px",
-  },
-  dimensionInput: {
-    padding: "10px",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    width: "80px",
+  instructions: {
+    fontSize: "1.1em",
+    margin: "10px 0 20px",
+    color: "#555",
   },
   btn: {
     padding: "10px 20px",
-    background: "#0072ff",
+    background: "#ff4757",
     color: "white",
     border: "none",
     borderRadius: "6px",
     cursor: "pointer",
     fontWeight: "bold",
+    marginTop: "20px",
   },
   mapContainer: {
-    marginTop: "20px",
     border: "2px solid #ddd",
     borderRadius: "10px",
     overflow: "hidden",
